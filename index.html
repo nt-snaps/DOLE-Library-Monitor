@@ -13,6 +13,8 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; transition: background-color 0.3s ease; }
         .dark { background-color: #020617; }
+        /* ล็อกขนาด SVG ของ Lucide ให้เต็มพื้นที่ wrapper */
+        i[data-lucide] svg { width: 100% !important; height: 100% !important; }
     </style>
     <script>
         tailwind.config = { darkMode: 'class' }
@@ -24,9 +26,19 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
         
+        // ปรับปรุง Icon Component ให้มีขนาดคงที่
         const Icon = ({ name, size = 16, className = "" }) => {
-            useEffect(() => { if(window.lucide) lucide.createIcons(); }, [name]);
-            return <i data-lucide={name} style={{width: size, height: size}} className={`inline-block ${className}`}></i>;
+            useEffect(() => { 
+                if(window.lucide) {
+                    lucide.createIcons(); 
+                }
+            }, [name]); // สั่งเรนเดอร์ใหม่ทุกครั้งที่ชื่อ Icon เปลี่ยน
+            
+            return (
+                <div className={`flex items-center justify-center shrink-0 ${className}`} style={{ width: size, height: size }}>
+                    <i data-lucide={name} style={{ width: size, height: size }}></i>
+                </div>
+            );
         };
 
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSzJ7aDALJey3lKTNRANGT5k_oGzU3gFUsG6PaZPeiv7DBspAe1BJFD0j7SNacrfgadj9P7pzprNGUJ/pub?gid=0&single=true&output=csv";
@@ -108,17 +120,17 @@
                 const val = String(status || "").toUpperCase().trim();
                 const isUp = val === "UP" || val === "ONLINE";
                 const isDown = val === "DOWN" || val === "OFFLINE";
-                const isPending = val === "";
 
                 return (
-                    <div className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all flex-1 h-12 ${
+                    <div className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all flex-1 h-14 md:h-16 ${
                         isUp ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 
                         isDown ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse' : 
                         'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 border-dashed'
                     }`}>
-                        <Icon name={icon} size={14} className="mb-0.5 opacity-80" />
-                        <span className="text-[7px] font-bold uppercase opacity-70 leading-none">{label}</span>
-                        <span className="text-[9px] font-black">{isUp ? "UP" : isDown ? "DOWN" : "WAIT"}</span>
+                        {/* ล็อกขนาด Icon ให้เป็น 16px เสมอทั้ง UP และ DOWN */}
+                        <Icon name={icon} size={16} className="mb-1 opacity-90" />
+                        <span className="text-[7px] md:text-[8px] font-bold uppercase opacity-70 leading-none mb-0.5">{label}</span>
+                        <span className="text-[9px] md:text-[10px] font-black">{isUp ? "UP" : isDown ? "DOWN" : "WAIT"}</span>
                     </div>
                 );
             };
