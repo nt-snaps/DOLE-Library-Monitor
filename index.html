@@ -10,9 +10,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Noto+Sans+Thai:wght@300;400;700&display=swap');
-        body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans Thai', sans-serif; transition: background-color 0.3s ease; }
+        .dark { background-color: #020617; }
     </style>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
 </head>
 <body>
     <div id="root"></div>
@@ -20,13 +24,11 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
         
-        // ดึง Icon จาก Lucide
-        const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { lucide.createIcons(); }, []);
-            return <i data-lucide={name} style={{width: size, height: size}} className={className}></i>;
+        const Icon = ({ name, size = 16, className = "" }) => {
+            useEffect(() => { if(window.lucide) lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{width: size, height: size}} className={`inline-block ${className}`}></i>;
         };
 
-        // URL สำหรับดึงข้อมูล (ใช้ URL เดิมของคุณ)
         const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSzJ7aDALJey3lKTNRANGT5k_oGzU3gFUsG6PaZPeiv7DBspAe1BJFD0j7SNacrfgadj9P7pzprNGUJ/pub?gid=0&single=true&output=csv";
 
         function App() {
@@ -35,6 +37,11 @@
             const [search, setSearch] = useState("");
             const [lastSync, setLastSync] = useState(null);
             const [isDarkMode, setIsDarkMode] = useState(false);
+
+            const toggleDarkMode = () => {
+                setIsDarkMode(!isDarkMode);
+                document.documentElement.classList.toggle('dark');
+            };
 
             const parseCSV = (csvText) => {
                 const lines = csvText.split(/\r?\n/);
@@ -67,9 +74,7 @@
                     setItems(parseCSV(csvText));
                     setLastSync(new Date().toLocaleTimeString('th-TH'));
                     setLoading(false);
-                } catch (err) {
-                    console.error("Error fetching data");
-                }
+                } catch (err) { console.error(err); }
             };
 
             useEffect(() => {
@@ -80,83 +85,142 @@
 
             const stats = useMemo(() => {
                 const total = items.length;
-                const online = items.filter(i => [i.vpn, i.internet].every(s => s === "UP")).length;
-                const offline = items.filter(i => [i.vpn, i.internet].some(s => s === "OFFLINE" || s === "DOWN")).length;
-                return { total, online, offline };
+                let online = 0, offline = 0, pending = 0;
+
+                items.forEach(i => {
+                    const statusArr = [i.vpn, i.internet, i.radius, i.syslog].map(s => String(s || "").toUpperCase());
+                    if (statusArr.every(s => s === "")) pending++;
+                    else if (statusArr.some(s => s === "OFFLINE" || s === "DOWN")) offline++;
+                    else online++;
+                });
+
+                const health = total > 0 ? Math.round((online / (total - pending)) * 100) : 0;
+                return { total, online, offline, pending, health };
             }, [items]);
 
             const filteredItems = items.filter(i => 
                 (i.name || "").toLowerCase().includes(search.toLowerCase()) ||
-                (i.Identity || "").toLowerCase().includes(search.toLowerCase())
+                (i.Identity || "").toLowerCase().includes(search.toLowerCase()) ||
+                (i.circuit || "").toLowerCase().includes(search.toLowerCase())
             );
 
             const StatusBadge = ({ status, label, icon }) => {
-                const isUp = status === "UP" || status === "ONLINE";
+                const val = String(status || "").toUpperCase().trim();
+                const isUp = val === "UP" || val === "ONLINE";
+                const isDown = val === "DOWN" || val === "OFFLINE";
+                const isPending = val === "";
+
                 return (
-                    <div className={`flex flex-col items-center justify-center p-2 rounded-lg border flex-1 ${isUp ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-600 border-rose-200 animate-pulse'}`}>
-                        <Icon name={icon} size={14} />
-                        <span className="text-[10px] font-bold">{label}: {isUp ? 'UP' : 'DOWN'}</span>
+                    <div className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all flex-1 h-12 ${
+                        isUp ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 
+                        isDown ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse' : 
+                        'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 border-dashed'
+                    }`}>
+                        <Icon name={icon} size={14} className="mb-0.5 opacity-80" />
+                        <span className="text-[7px] font-bold uppercase opacity-70 leading-none">{label}</span>
+                        <span className="text-[9px] font-black">{isUp ? "UP" : isDown ? "DOWN" : "WAIT"}</span>
                     </div>
                 );
             };
 
             return (
-                <div className={`min-h-screen ${isDarkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'} p-4`}>
-                    <div className="max-w-4xl mx-auto">
+                <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'dark bg-slate-950' : 'bg-slate-50'}`}>
+                    <div className="max-w-6xl mx-auto p-4 md:p-8">
+                        
                         <header className="flex justify-between items-center mb-8">
-                            <h1 className="text-xl font-black uppercase tracking-tight">Dole <span className="text-emerald-600">Library</span> Monitor</h1>
-                            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-white dark:bg-slate-800 rounded-full shadow-sm">
-                                <Icon name={isDarkMode ? "sun" : "moon"} />
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <div className="bg-emerald-600 p-2 rounded-xl text-white shadow-lg shadow-emerald-500/30">
+                                    <Icon name="file-spreadsheet" size={20} />
+                                </div>
+                                <h1 className="text-xl font-extrabold dark:text-white uppercase tracking-tight">Dole <span className="text-emerald-600">Library</span> Monitor</h1>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={toggleDarkMode} className="p-2.5 bg-white dark:bg-slate-900 dark:text-white rounded-full shadow-sm border border-slate-200 dark:border-slate-800 transition-all">
+                                    <Icon name={isDarkMode ? "sun" : "moon"} size={18} />
+                                </button>
+                                <button onClick={fetchData} className="p-2.5 bg-white dark:bg-slate-900 dark:text-white rounded-full shadow-sm border border-slate-200 dark:border-slate-800">
+                                    <Icon name="refresh-cw" size={18} />
+                                </button>
+                            </div>
                         </header>
 
-                        <div className="grid grid-cols-3 gap-4 mb-6">
-                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm text-center border border-slate-200 dark:border-slate-800">
-                                <div className="text-2xl font-bold">{stats.total}</div>
-                                <div className="text-[10px] text-slate-400 font-bold uppercase">ทั้งหมด</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 text-center">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ทั้งหมด</p>
+                                <div className="text-3xl font-black dark:text-white">{stats.total}</div>
                             </div>
-                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm text-center border border-emerald-200">
-                                <div className="text-2xl font-bold text-emerald-600">{stats.online}</div>
-                                <div className="text-[10px] text-emerald-500 font-bold uppercase">ปกติ</div>
+                            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl shadow-sm border border-emerald-500/20 text-center">
+                                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">ปกติ</p>
+                                <div className="text-3xl font-black text-emerald-600">{stats.online}</div>
                             </div>
-                            <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm text-center border border-rose-200">
-                                <div className="text-2xl font-bold text-rose-600">{stats.offline}</div>
-                                <div className="text-[10px] text-rose-500 font-bold uppercase">ขัดข้อง</div>
+                            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl shadow-sm border border-rose-500/20 text-center">
+                                <p className="text-[10px] font-bold text-rose-600 uppercase tracking-widest mb-1">ขัดข้อง</p>
+                                <div className="text-3xl font-black text-rose-600">{stats.offline}</div>
+                            </div>
+                            <div className="bg-emerald-600 p-5 rounded-3xl shadow-lg shadow-emerald-500/20 text-center text-white">
+                                <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest mb-1">ความพร้อมระบบ</p>
+                                <div className="text-3xl font-black">{stats.health}%</div>
                             </div>
                         </div>
 
-                        <input 
-                            type="text" 
-                            placeholder="ค้นหาชื่อ หรือ Identity..." 
-                            className="w-full p-4 rounded-2xl mb-6 border-none ring-1 ring-slate-200 dark:ring-slate-800 dark:bg-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
-                            onChange={(e) => setSearch(e.target.value)}
-                        />
+                        <div className="relative mb-8">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                <Icon name="search" size={18} />
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="ค้นหาชื่อหน่วยงาน, เลขวงจร, Identity..." 
+                                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white dark:bg-slate-900 dark:text-white border-none shadow-sm ring-1 ring-slate-200 dark:ring-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium text-sm"
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
 
-                        <div className="space-y-3">
-                            {filteredItems.map((item, idx) => (
-                                <div key={idx} className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="font-bold">{item.name}</h3>
-                                            <p className="text-xs text-slate-400 font-mono">ID: {item.Identity} | CIR: {item.circuit}</p>
+                        <div className="space-y-4">
+                            {loading ? (
+                                <div className="py-20 text-center"><Icon name="refresh-cw" className="animate-spin text-emerald-500" size={32} /></div>
+                            ) : filteredItems.map((item, idx) => (
+                                <div key={idx} className="bg-white dark:bg-slate-900 p-5 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 hover:border-emerald-500/30 transition-all group">
+                                    <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                                        
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <div className="w-12 h-12 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center font-black text-slate-400 border border-slate-100 dark:border-slate-700 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                                {item.id}
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-base font-bold text-slate-800 dark:text-slate-200 truncate mb-1">{item.name}</h3>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-md">ID: {item.Identity}</span>
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-md uppercase">CIR: {item.circuit}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="text-right text-[10px] font-mono text-slate-400">
-                                            Update: {item.uptime}
+
+                                        <div className="flex flex-col md:flex-row items-center gap-4">
+                                            <div className="grid grid-cols-4 gap-1.5 w-full md:w-auto">
+                                                <StatusBadge label="VPN" status={item.vpn} icon="activity" />
+                                                <StatusBadge label="NET" status={item.internet} icon="wifi" />
+                                                <StatusBadge label="RAD" status={item.radius} icon="shield" />
+                                                <StatusBadge label="LOG" status={item.syslog} icon="database" />
+                                            </div>
+                                            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 min-w-[140px] justify-center">
+                                                <Icon name="clock" size={12} className="text-slate-400" />
+                                                <span className="text-[11px] font-mono font-bold text-slate-500 dark:text-slate-400">{item.uptime || '00:00:00'}</span>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        <StatusBadge label="VPN" status={item.vpn} icon="activity" />
-                                        <StatusBadge label="NET" status={item.internet} icon="wifi" />
-                                        <StatusBadge label="RAD" status={item.radius} icon="shield" />
-                                        <StatusBadge label="LOG" status={item.syslog} icon="database" />
+
                                     </div>
                                 </div>
                             ))}
                         </div>
-                        
-                        <footer className="mt-10 text-center text-[10px] text-slate-400 uppercase tracking-widest">
-                            Last Sync: {lastSync} | Powered by NT SNAPS Team
+
+                        <footer className="mt-12 text-center">
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-slate-500 dark:text-slate-400">Last Sync: {lastSync}</span>
+                            </div>
+                            <p className="text-[10px] font-medium text-slate-400">Dole Library Monitor By <span className="font-bold text-slate-600 dark:text-slate-300">NT SNAPS Team</span></p>
                         </footer>
+
                     </div>
                 </div>
             );
@@ -166,5 +230,4 @@
         root.render(<App />);
     </script>
 </body>
-
 </html>
