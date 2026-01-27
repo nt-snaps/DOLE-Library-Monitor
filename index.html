@@ -122,12 +122,12 @@
                 const isDown = val === "DOWN" || val === "OFFLINE";
 
                 return (
-                    <div className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all flex-1 h-14 md:h-16 ${
+                    /* เพิ่ม w-16 (มือถือ) และ md:w-20 (คอมพิวเตอร์) เพื่อล็อกขนาดกรอบให้เท่ากัน */
+                    <div className={`flex flex-col items-center justify-center p-1.5 rounded-xl border transition-all h-14 md:h-16 w-16 md:w-20 ${
                         isUp ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 
                         isDown ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400 animate-pulse' : 
                         'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 border-dashed'
                     }`}>
-                        {/* ล็อกขนาด Icon ให้เป็น 16px เสมอทั้ง UP และ DOWN */}
                         <Icon name={icon} size={16} className="mb-1 opacity-90" />
                         <span className="text-[7px] md:text-[8px] font-bold uppercase opacity-70 leading-none mb-0.5">{label}</span>
                         <span className="text-[9px] md:text-[10px] font-black">{isUp ? "UP" : isDown ? "DOWN" : "WAIT"}</span>
@@ -243,3 +243,4 @@
     </script>
 </body>
 </html>
+
